@@ -211,6 +211,70 @@ export const getHiddenApps = query({
   },
 });
 
+// Toggle favorite
+export const toggleFavorite = mutation({
+  args: { packageName: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("favorites")
+      .withIndex("by_package", (q) => q.eq("packageName", args.packageName))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    } else {
+      const count = (await ctx.db.query("favorites").collect()).length;
+      await ctx.db.insert("favorites", { packageName: args.packageName, position: count });
+    }
+    return null;
+  },
+});
+
+// Get favorites
+export const getFavorites = query({
+  args: {},
+  returns: v.array(v.object({
+    _id: v.id("favorites"),
+    _creationTime: v.number(),
+    packageName: v.string(),
+    position: v.number(),
+  })),
+  handler: async (ctx) => {
+    return await ctx.db.query("favorites").order("asc").collect();
+  },
+});
+
+// Uninstall / reinstall
+export const toggleUninstall = mutation({
+  args: { packageName: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("uninstalledApps")
+      .withIndex("by_package", (q) => q.eq("packageName", args.packageName))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    } else {
+      await ctx.db.insert("uninstalledApps", { packageName: args.packageName });
+    }
+    return null;
+  },
+});
+
+// Get uninstalled
+export const getUninstalledApps = query({
+  args: {},
+  returns: v.array(v.object({
+    _id: v.id("uninstalledApps"),
+    _creationTime: v.number(),
+    packageName: v.string(),
+  })),
+  handler: async (ctx) => {
+    return await ctx.db.query("uninstalledApps").collect();
+  },
+});
+
 // Record app usage (call when user opens a blocked/time-limited app)
 export const recordAppUsage = mutation({
   args: {
