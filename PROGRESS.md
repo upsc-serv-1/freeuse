@@ -1,7 +1,7 @@
 # Minimalist Launcher - Progress Tracker
 
 ## Project Overview
-Functional app blocker and distraction manager built with Expo + Convex.
+Functional app blocker and distraction manager - refactoring from conceptual Expo+Convex to native Android launcher with real app blocking.
 
 ## Repo
 https://github.com/upsc-serv-1/freeuse (branch: main)
@@ -10,56 +10,46 @@ https://github.com/upsc-serv-1/freeuse (branch: main)
 
 ## ✅ Completed Steps
 
-### Step 1-3: Initial Setup
-- [x] App config, black splash, progress tracker
-- [x] Home screen, search screen, settings screen scaffold
-- [x] Pushed to GitHub
-
-### Step 4: Convex Backend + Functional App ⬅️ CURRENT
-- [x] Convex schema: apps, blocklist, appRenames, focusSessions, hiddenApps tables
-- [x] queries: getAllApps, getBlocklist, getAppRenames, getHiddenApps, getTodaysUsage
-- [x] mutations: seedApps, toggleBlockApp, setTimeLimit, removeFromBlocklist, renameApp, toggleHiddenApp, recordAppUsage
-- [x] Seeded 20 distracting apps (Instagram, TikTok, YouTube, etc.)
-- [x] Convex dev server running on port 3210
-- [x] `.env.local` configured with Convex URL
-
-### Step 5: Functional UI
-- [x] **Home screen** - live clock, date, today's restrictions summary (blocked + timed out apps)
-- [x] **All Apps screen** (`/app-list`) - text-only app names (no icons), search, block/unblock, set time limits (1/5/15/30/60 min), rename apps
-- [x] **Focus tab** - view all blocked apps & timed apps with progress bars, usage tracking
-- [x] **Search screen** - search app names, quick block + time limit buttons
-- [x] **Settings screen** - all config sections
+### Phase 0: Setup
+- [x] Cloned repo from GitHub
+- [x] Configured git remote with PAT
+- [x] Created progress tracker
 
 ---
 
-## 🎯 How It Works
+## 🎯 Current Phase: Phase 1 - Eject & Native Android Config
 
-1. **App list** shows app names only (no icons) - searchable
-2. **Block an app** → it's prevented from opening (shows "BLOCKED" status)
-3. **Set time limit** → choose 1/5/15/30/60 min per day → tracks usage count
-4. **Rename app** → change Instagram to "Distraction 1" to reduce temptation
-5. **Focus tab** → shows all restrictions with usage progress bars
-6. **Home screen** → quick summary of today's restrictions
+### Step 1: Eject to Bare Workflow ⬅️ CURRENT
+- [ ] Run `npx expo prebuild` to generate android/ and ios/ directories
 
----
+### Step 2: Make Default Launcher
+- [ ] Add `android.intent.category.HOME` and `android.intent.category.DEFAULT` to MainActivity
 
-## 🔮 Next Steps Available
-- [ ] Grayscale mode toggle (CSS filter effect)
-- [ ] Hidden apps management
-- [ ] Notification filter settings page
-- [ ] 12h/24h clock format toggle
-- [ ] Animations & transitions (screen transitions, dialog overlays)
-- [ ] AsyncStorage persistence for settings (backup Convex)
-- [ ] Gesture support (swipe up for apps drawer)
+### Step 3: Add Android Permissions
+- [ ] PACKAGE_USAGE_STATS
+- [ ] SYSTEM_ALERT_WINDOW
+- [ ] BIND_ACCESSIBILITY_SERVICE
+- [ ] REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+- [ ] FOREGROUND_SERVICE
+- [ ] QUERY_ALL_PACKAGES
+
+### Step 4: Native Android Services
+- [ ] AppAccessibilityService.kt - monitors foreground app
+- [ ] BlockingAndReminderService.kt - foreground service for blocking
+- [ ] BlockOverlayActivity.kt - blocking overlay
+- [ ] Native Module Bridge - React Native ↔ Android native
+
+### Step 5: Offline Storage Migration
+- [ ] Remove Convex dependency
+- [ ] Implement react-native-mmkv for local storage
+- [ ] Refactor UI to use local storage instead of Convex queries
+- [ ] Ensure all blocking rules work offline
 
 ---
 
 ## Notes for Next Agent
-- Convex URL is in `.env.local` (port 3210)
-- Convex dev server runs in the `convex` terminal session
-- TypeScript: `npx tsc --noEmit` passes cleanly
-- Seed apps: `npx convex run apps:seedApps` (already seeded)
-- New screens: `app/app-list.tsx` (main functional screen)
-- Tab layout: Home + Focus tabs
 - Git remote uses PAT authentication (stored in remote URL)
-- The app **cannot actually block native Android apps** from React Native - it's a conceptual blocker that shows restrictions UI
+- Push pattern: commit with `Step X: description`, then push
+- After `npx expo prebuild`, android/ directory will be generated
+- Convex dev server can be stopped after migration to local storage
+- TypeScript: `npx tsc --noEmit` to check types
