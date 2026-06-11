@@ -27,25 +27,25 @@ A clean, minimal launcher with focus tools - app blocking, timers, grayscale mod
 - [x] Quick app shortcuts grid (Phone, Messages, Camera, Music)
 - [x] "Swipe up for apps" bottom hint
 
-### Step 3: Search screen
+### Step 3: Search screen (`app/search.tsx`)
 - [x] Full-screen search with auto-focus
 - [x] App listing grouped by categories
 - [x] Web search suggestion
 - [x] Favorites row
 - [x] Empty state when no results
 
-### Step 4: Settings screen
+### Step 4: Settings screen (`app/settings.tsx`)
 - [x] Display settings (Dark mode, Grayscale, Clock format)
 - [x] Focus settings (Blocklist, App Timers)
 - [x] Privacy settings (Hidden Apps, App Renaming)
 - [x] About section with Premium badge
 - [x] Navigation back button
-- [x] Premium-by-default unlocked badge
+- [x] Premium-by-default unlocked badge (hardcoded)
 
-### Step 5: Explore/Apps screen
+### Step 5: Explore/Apps screen (`app/(tabs)/explore.tsx`)
 - [x] All apps grid view
 - [x] App search/filter
-- [x] Focus Tools section (6 feature cards)
+- [x] Focus Tools section (6 feature cards: App Timers, Blocklist, Grayscale Mode, Hidden Apps, App Renaming, Notification Filter)
 - [x] App count display
 
 ### Step 6: Tab navigation setup
@@ -54,27 +54,64 @@ A clean, minimal launcher with focus tools - app blocking, timers, grayscale mod
 - [x] Haptic tab feedback
 - [x] Clean tab bar styling
 
-### Remaining Features
-- [ ] App Timers functionality (set time limits)
-- [ ] Blocklist management UI
-- [ ] Grayscale mode toggle (CSS filter)
+### Remaining Features (Next Steps)
+- [ ] App Timers functionality (set time limits with duration chips: 1min, 5min, 15min)
+- [ ] Blocklist management UI (select/add/remove apps)
+- [ ] Grayscale mode toggle (CSS filter effect on the whole app)
 - [ ] Hidden apps management
-- [ ] App renaming feature
-- [ ] Notification filter settings
-- [ ] Convex backend integration
+- [ ] App renaming feature (alias names for distracting apps)
+- [ ] Notification filter settings page
+- [ ] Convex backend integration (schema for settings, blocklist, timers)
 - [ ] 12h/24h clock format toggle
-- [ ] Animations & transitions
-- [ ] Gesture support (swipe up for apps)
+- [ ] Animations & transitions (screen transitions, dialog overlays)
+- [ ] Gesture support (swipe up for apps drawer)
 - [ ] AsyncStorage persistence for settings
 - [ ] Dark/Light mode toggle functionality
+- [ ] Glassmorphism dialog overlays for timer selection
+
+---
+
+## Design System
+- **Typography**: High-contrast, monochrome text-based layouts (Inter/Outfit style)
+- **Colors**: Clean whitespace with muted colors, semantic tokens via CSS variables
+- **Dialogs**: Translucent/glassmorphism overlays for selector dialogs
+- **Premium**: All features unlocked by default (hardcoded `isPremiumUnlocked() = true`)
 
 ---
 
 ## Notes for Next Agent
+
+### Git Push ✅ Resolved
+- Push now works with the updated PAT
+- All commits pushed successfully to `main` branch
+
+### Current State
+- **Local commits**: All changes are committed locally on `main` branch
+- **Last commit**: `c6747fb` - "Step 2: Build home screen with live clock, date display and search"
+- **Type check**: `npx tsc --noEmit` passes cleanly (zero errors)
+
+### App Structure
+```
+app/
+  _layout.tsx                          # Root layout (Convex, theme, gesture handler)
+  (tabs)/
+    _layout.tsx                        # Tab navigator (Home + Apps)
+    index.tsx                          # Home screen - clock, date, search, shortcuts
+    explore.tsx                        # Apps screen - grid + focus tools
+  search.tsx                           # Search screen - full app search
+  settings.tsx                         # Settings screen - all config options
+  +not-found.tsx                       # 404 screen
+components/ui/                         # Pre-built UI component library
+config/navigation.config.ts            # Navigation config
+constants/Colors.ts                    # Color constants
+convex/schema.ts                       # Convex schema (empty, needs population)
+```
+
+### Technical Notes
 - Convex URL is configured in `.env.development.local`
 - The app uses `SafeAreaView` from `@/components/ui` for safe area handling
 - Lucide icons are available from `lucide-react-native`
 - All UI components from `@/components/ui` should be used for consistency
 - Dark/light mode is handled via CSS variables in `global.css`
-- **Git Push Issue**: PAT authentication fails with 403. Need valid PAT with write access to `upsc-serv-1/freeuse`
-- Routes created: `app/(tabs)/index.tsx` (Home), `app/(tabs)/explore.tsx` (Apps), `app/settings.tsx`, `app/search.tsx`
+- TypeScript strict mode is enabled
+- The expo dev server runs on port 3000 with hot reload
