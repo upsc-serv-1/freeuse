@@ -344,11 +344,8 @@ export const getUsageForRange = query({
   args: { startDate: v.string(), endDate: v.string(), packageName: v.string() },
   returns: v.number(),
   handler: async (ctx, args) => {
-    const sessions = await ctx.db
-      .query("focusSessions")
-      .withIndex("by_date_app", (q) => q.eq("packageName", args.packageName))
-      .collect();
-    const filtered = sessions.filter(s => s.date >= args.startDate && s.date <= args.endDate);
+    const allSessions = await ctx.db.query("focusSessions").collect();
+    const filtered = allSessions.filter(s => s.packageName === args.packageName && s.date >= args.startDate && s.date <= args.endDate);
     return filtered.reduce((sum, s) => sum + s.minutesUsed, 0);
   },
 });

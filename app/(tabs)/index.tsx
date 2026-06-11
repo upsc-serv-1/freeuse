@@ -81,7 +81,6 @@ export default function HomeScreen() {
   const toggleFav = useMutation(api.apps.toggleFavorite);
   const toggleUninstall = useMutation(api.apps.toggleUninstall);
   const recordUsage = useMutation(api.apps.recordAppUsage);
-  const getRangeUsage = useMutation(api.apps.getUsageForRange);
 
   // ═══ UI State ═══
   const [ctxApp, setCtxApp] = useState<any>(null);
