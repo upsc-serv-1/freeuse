@@ -311,6 +311,7 @@ export const recordAppUsage = mutation({
   args: {
     packageName: v.string(),
     date: v.string(), // "YYYY-MM-DD"
+    minutes: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -319,20 +320,36 @@ export const recordAppUsage = mutation({
       .withIndex("by_date_app", (q) => q.eq("date", args.date).eq("packageName", args.packageName))
       .first();
 
+    const addMinutes = args.minutes ?? 1;
+
     if (existing) {
       await ctx.db.patch(existing._id, {
-        minutesUsed: existing.minutesUsed + 1,
+        minutesUsed: existing.minutesUsed + addMinutes,
         lastOpened: Date.now(),
       });
     } else {
       await ctx.db.insert("focusSessions", {
         packageName: args.packageName,
         date: args.date,
-        minutesUsed: 1,
+        minutesUsed: addMinutes,
         lastOpened: Date.now(),
       });
     }
     return null;
+  },
+});
+
+// Get usage for a specific date range (last 7 days)
+export const getUsageForRange = query({
+  args: { startDate: v.string(), endDate: v.string(), packageName: v.string() },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const sessions = await ctx.db
+      .query("focusSessions")
+      .withIndex("by_date_app", (q) => q.eq("packageName", args.packageName))
+      .collect();
+    const filtered = sessions.filter(s => s.date >= args.startDate && s.date <= args.endDate);
+    return filtered.reduce((sum, s) => sum + s.minutesUsed, 0);
   },
 });
 
