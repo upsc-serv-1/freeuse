@@ -82,18 +82,18 @@ export default function HomeScreen() {
   }, []);
 
   // ═══ Permissions check ═══
-  const { perms, checkPermissions, openAccessibility, openUsageStats, openBatteryOpt } = usePermissions();
+  const { perms, checkPermissions, openAccessibility, openUsageStats, openBatteryOpt, openOverlaySettings } = usePermissions();
   const [showPermModal, setShowPermModal] = useState(false);
 
   useEffect(() => {
     if (!perms.checking) {
-      if (!perms.accessibilityEnabled || !perms.usageAccessGranted) {
+      if (!perms.accessibilityEnabled || !perms.usageAccessGranted || !perms.overlayPermission) {
         // Delay showing the modal slightly so the UI renders first
         const t = setTimeout(() => setShowPermModal(true), 500);
         return () => clearTimeout(t);
       }
     }
-  }, [perms.checking, perms.accessibilityEnabled, perms.usageAccessGranted]);
+  }, [perms.checking, perms.accessibilityEnabled, perms.usageAccessGranted, perms.overlayPermission]);
 
   // ═══ UI State ═══
   const [ctxApp, setCtxApp] = useState<any>(null);
@@ -633,10 +633,21 @@ export default function HomeScreen() {
                 </View>
               </View>
 
+              {/* Display Over Other Apps */}
+              <View className="flex-row items-center mb-4 bg-white/5 rounded-2xl p-4">
+                <View className="w-10 h-10 rounded-full bg-white/10 items-center justify-center mr-4">
+                  <Text className="text-white font-bold">2</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-white text-sm font-medium">Display Over Other Apps</Text>
+                  <Text className="text-white/40 text-xs mt-0.5">Required to show blocking overlay on Android 10+</Text>
+                </View>
+              </View>
+
               {/* Accessibility */}
               <View className="flex-row items-center mb-6 bg-white/5 rounded-2xl p-4">
                 <View className="w-10 h-10 rounded-full bg-white/10 items-center justify-center mr-4">
-                  <Text className="text-white font-bold">2</Text>
+                  <Text className="text-white font-bold">3</Text>
                 </View>
                 <View className="flex-1">
                   <Text className="text-white text-sm font-medium">Accessibility Service</Text>
@@ -650,6 +661,13 @@ export default function HomeScreen() {
                 className="bg-white/10 rounded-full py-3.5 items-center mb-3 active:opacity-70"
               >
                 <Text className="text-white text-sm font-medium">Open Usage Access Settings</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => { openOverlaySettings(); }}
+                className="bg-white/10 rounded-full py-3.5 items-center mb-3 active:opacity-70"
+              >
+                <Text className="text-white text-sm font-medium">Allow Display Over Other Apps</Text>
               </Pressable>
 
               <Pressable

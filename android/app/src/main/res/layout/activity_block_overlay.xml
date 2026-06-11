@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#E6000000"
+    android:padding="32dp">
+
+    <!-- Block icon -->
+    <TextView
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:gravity="center"
+        android:textSize="32dp"
+        android:text="🚫"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Title -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="This App is Blocked"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.05"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Subtitle -->
+    <TextView
+        android:id="@+id/blocked_app_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Focus on what matters"
+        android:textColor="#B0FFFFFF"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:layout_marginBottom="32dp" />
+
+    <!-- Divider -->
+    <View
+        android:layout_width="48dp"
+        android:layout_height="1dp"
+        android:background="#40FFFFFF"
+        android:layout_marginBottom="32dp" />
+
+    <!-- Description -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="You've chosen to block this app\nto stay focused on your goals."
+        android:textColor="#80FFFFFF"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:lineSpacingExtra="4dp"
+        android:layout_marginBottom="48dp" />
+
+    <!-- Go back to Home button -->
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btn_go_home"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="240dp"
+        android:paddingLeft="48dp"
+        android:paddingTop="14dp"
+        android:paddingRight="48dp"
+        android:paddingBottom="14dp"
+        android:text="GO BACK TO HOME"
+        android:textColor="#000000"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:background="@drawable/btn_white_pill"
+        android:gravity="center"
+        android:stateListAnimator="@null" />
+
+</LinearLayout>

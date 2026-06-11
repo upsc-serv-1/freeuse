@@ -2,6 +2,8 @@ package com.anonymous.minimalist.bridge;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
+import android.provider.Settings;
 import android.util.Log;
 
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -40,12 +42,10 @@ public class AppBlockerModule extends ReactContextBaseJavaModule {
 
     /**
      * Update the list of blocked apps on the native side.
-     * This is called from React Native whenever the user changes their blocklist.
      */
     @ReactMethod
     public void updateBlockedApps(ReadableArray blockedPackages, Promise promise) {
         try {
-            // Save to SharedPreferences (fast local storage)
             SharedPreferences prefs = getReactApplicationContext()
                 .getSharedPreferences(PREFS_NAME, ReactApplicationContext.MODE_PRIVATE);
 
@@ -56,7 +56,6 @@ public class AppBlockerModule extends ReactContextBaseJavaModule {
 
             prefs.edit().putString("blocked_apps", jsonArray.toString()).apply();
 
-            // Send to the foreground service
             Intent intent = new Intent(getReactApplicationContext(), BlockingAndReminderService.class);
             intent.putExtra("blocked_apps", jsonArray.toString());
             getReactApplicationContext().startService(intent);
@@ -95,14 +94,14 @@ public class AppBlockerModule extends ReactContextBaseJavaModule {
         try {
             String service = getReactApplicationContext().getPackageName() + "/" +
                 "com.anonymous.minimalist.services.AppAccessibilityService";
-            int enabled = android.provider.Settings.Secure.getInt(
+            int enabled = Settings.Secure.getInt(
                 getReactApplicationContext().getContentResolver(),
-                android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 0
+                Settings.Secure.ACCESSIBILITY_ENABLED, 0
             );
             if (enabled == 1) {
-                String enabledServices = android.provider.Settings.Secure.getString(
+                String enabledServices = Settings.Secure.getString(
                     getReactApplicationContext().getContentResolver(),
-                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
                 );
                 promise.resolve(enabledServices != null && enabledServices.contains(service));
             } else {
@@ -114,11 +113,42 @@ public class AppBlockerModule extends ReactContextBaseJavaModule {
     }
 
     /**
+     * Check if the app has overlay permission (SYSTEM_ALERT_WINDOW).
+     * Required on Android 10+ to launch blocking activity from background.
+     */
+    @ReactMethod
+    public void hasOverlayPermission(Promise promise) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                promise.resolve(Settings.canDrawOverlays(getReactApplicationContext()));
+            } else {
+                promise.resolve(true); // Pre-Marshmallow, overlay permission is granted at install time
+            }
+        } catch (Exception e) {
+            promise.resolve(false);
+        }
+    }
+
+    /**
+     * Open the overlay permission settings so the user can grant
+     * SYSTEM_ALERT_WINDOW permission (required for launching blocking overlay).
+     */
+    @ReactMethod
+    public void openOverlaySettings() {
+        Intent intent = new Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:" + getReactApplicationContext().getPackageName())
+        );
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getReactApplicationContext().startActivity(intent);
+    }
+
+    /**
      * Open the usage access settings so the user can grant permission.
      */
     @ReactMethod
     public void openUsageAccessSettings() {
-        Intent intent = new Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS);
+        Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getReactApplicationContext().startActivity(intent);
     }
@@ -128,7 +158,7 @@ public class AppBlockerModule extends ReactContextBaseJavaModule {
      */
     @ReactMethod
     public void openAccessibilitySettings() {
-        Intent intent = new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getReactApplicationContext().startActivity(intent);
     }
@@ -138,7 +168,7 @@ public class AppBlockerModule extends ReactContextBaseJavaModule {
      */
     @ReactMethod
     public void openBatteryOptimizationSettings() {
-        Intent intent = new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+        Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getReactApplicationContext().startActivity(intent);
     }

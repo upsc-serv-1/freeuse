@@ -26,11 +26,13 @@ const AppBlockerNative = Platform.OS === 'android' ? NativeModules.AppBlockerMod
 interface PermissionsState {
   accessibilityEnabled: boolean;
   usageAccessGranted: boolean;
+  overlayPermission: boolean;
   checking: boolean;
 }
 const defaultPerms: PermissionsState = {
   accessibilityEnabled: false,
   usageAccessGranted: false,
+  overlayPermission: false,
   checking: true,
 };
 export const PermissionsContext = createContext<{
@@ -39,12 +41,14 @@ export const PermissionsContext = createContext<{
   openAccessibility: () => void;
   openUsageStats: () => void;
   openBatteryOpt: () => void;
+  openOverlaySettings: () => void;
 }>({
   perms: defaultPerms,
   checkPermissions: async () => {},
   openAccessibility: () => {},
   openUsageStats: () => {},
   openBatteryOpt: () => {},
+  openOverlaySettings: () => {},
 });
 
 export function usePermissions() {
@@ -60,20 +64,24 @@ export default function RootLayout() {
 
   const checkPermissions = async () => {
     if (!AppBlockerNative) {
-      setPerms({ accessibilityEnabled: false, usageAccessGranted: false, checking: false });
+      setPerms({ accessibilityEnabled: false, usageAccessGranted: false, overlayPermission: false, checking: false });
       return;
     }
     try {
-      const accessibilityEnabled = await AppBlockerNative.isAccessibilityServiceEnabled();
-      setPerms({ accessibilityEnabled, usageAccessGranted: true, checking: false });
+      const [accessibilityEnabled, overlayPermission] = await Promise.all([
+        AppBlockerNative.isAccessibilityServiceEnabled(),
+        AppBlockerNative.hasOverlayPermission(),
+      ]);
+      setPerms({ accessibilityEnabled, usageAccessGranted: true, overlayPermission, checking: false });
     } catch {
-      setPerms({ accessibilityEnabled: false, usageAccessGranted: false, checking: false });
+      setPerms({ accessibilityEnabled: false, usageAccessGranted: false, overlayPermission: false, checking: false });
     }
   };
 
   const openAccessibility = () => AppBlockerNative?.openAccessibilitySettings();
   const openUsageStats = () => AppBlockerNative?.openUsageAccessSettings();
   const openBatteryOpt = () => AppBlockerNative?.openBatteryOptimizationSettings();
+  const openOverlaySettings = () => AppBlockerNative?.openOverlaySettings();
 
   // Start native blocking service on app load
   useEffect(() => {
@@ -95,7 +103,7 @@ export default function RootLayout() {
   }
 
   return (
-    <PermissionsContext.Provider value={{ perms, checkPermissions, openAccessibility, openUsageStats, openBatteryOpt }}>
+    <PermissionsContext.Provider value={{ perms, checkPermissions, openAccessibility, openUsageStats, openBatteryOpt, openOverlaySettings }}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <BottomSheetModalProvider>
           <UIThemeProvider>
