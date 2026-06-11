@@ -1,7 +1,6 @@
 import { Tabs } from "expo-router";
-import { Home, Search, Settings } from "lucide-react-native";
+import { Home, Shield } from "lucide-react-native";
 import { Platform } from "react-native";
-
 import { HapticTab } from "@/components/HapticTab";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
@@ -23,9 +22,7 @@ export default function TabLayout() {
           default: {},
         }),
         tabBarStyle: Platform.select({
-          ios: {
-            position: "absolute",
-          },
+          ios: { position: "absolute" },
           default: {},
         }),
       }}
@@ -40,8 +37,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Apps",
-          tabBarIcon: ({ color }) => <Search size={22} color={color} />,
+          title: "Focus",
+          tabBarIcon: ({ color }) => <Shield size={22} color={color} />,
         }}
       />
     </Tabs>
