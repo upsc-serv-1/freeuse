@@ -1,52 +1,54 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { SafeAreaView, Text, View, Input } from "@/components/ui";
 import { StatusBar } from "expo-status-bar";
 import {
   Settings, Star, Ban, Edit3, EyeOff, Trash2, Info,
-  Search, Clock, AlertTriangle, Phone, Camera, ChevronRight, ArrowRight
+  Search, Clock, AlertTriangle, Phone, Camera, ArrowRight
 } from "lucide-react-native";
 import { Pressable, ScrollView, Modal, Dimensions, Animated, PanResponder } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useLocalApps, ensureSeeded } from "@/hooks/useLocalStorage";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TIME_OPTS = [1, 5, 15, 30, 60];
 const BLOCK_DAYS_OPTS = [1, 3, 7, 30];
 const DISTRACTING = ["Social", "Entertainment", "Messaging", "Shopping", "Music"];
 
-// ═══ Helpers ═══
 function useTime() {
-  const [t, s] = useState(new Date());
-  useEffect(() => { const i = setInterval(() => s(new Date()), 1000); return () => clearInterval(i); }, []);
-  return t;
+  const ref = useRef({ interval: null as any });
+  const now = new Date();
+  const [t, s] = [now, (_: Date) => {}];
+  // Simplified - just return current time
+  return new Date();
 }
+
 function fmtTime(d: Date) {
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
+
 function fmtDate(d: Date) {
   const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const mos = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   return `${days[d.getDay()]}, ${d.getDate()}${getOrdinal(d.getDate())} ${mos[d.getMonth()]}`;
 }
+
 function getOrdinal(n: number) {
   if (n > 3 && n < 21) return "th";
   switch (n % 10) { case 1: return "st"; case 2: return "nd"; case 3: return "rd"; default: return "th"; }
 }
+
 function today() {
   const d = new Date();
   return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
 }
-function daysAgo(n: number) {
-  const d = new Date(); d.setDate(d.getDate() - n);
-  return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
-}
+
 function formatExpiry(ts: number): string {
   const d = new Date(ts);
   const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const mos = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${days[d.getDay()]}, ${mos[d.getMonth()]} ${d.getDate()}`;
 }
+
 function fmtMins(m: number): string {
   if (m < 60) return `${Math.round(m)} min`;
   const h = Math.floor(m / 60);
@@ -54,33 +56,29 @@ function fmtMins(m: number): string {
   return `${h} h ${mins > 0 ? mins + ' min' : ''}`.trim();
 }
 
-// Alphabet for fast scroll
 const ALPHA = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export default function HomeScreen() {
-  const time = useTime();
   const router = useRouter();
   const listScrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
+  const [time, setTime] = useState(new Date());
 
-  // ═══ Data ═══
-  const allApps = useQuery(api.apps.getAllApps);
-  const blocklist = useQuery(api.apps.getBlocklist);
-  const renames = useQuery(api.apps.getAppRenames);
-  const hidden = useQuery(api.apps.getHiddenApps);
-  const favs = useQuery(api.apps.getFavorites);
-  const uninstalled = useQuery(api.apps.getUninstalledApps);
-  const usage = useQuery(api.apps.getTodaysUsage, { date: today() });
+  // ═══ Local Storage Data ═══
+  const {
+    loaded, apps, blocklist, renames, hidden, favorites, uninstalled, usage,
+    toggleBlock, blockForDays, setTimeLimit, renameApp, toggleHidden,
+    toggleFavorite, toggleUninstall, recordUsage, refresh
+  } = useLocalApps();
 
-  // ═══ Mutations ═══
-  const toggleBlock = useMutation(api.apps.toggleBlockApp);
-  const blockForDays = useMutation(api.apps.blockAppForDays);
-  const setLimit = useMutation(api.apps.setTimeLimit);
-  const renameApp = useMutation(api.apps.renameApp);
-  const toggleHidden = useMutation(api.apps.toggleHiddenApp);
-  const toggleFav = useMutation(api.apps.toggleFavorite);
-  const toggleUninstall = useMutation(api.apps.toggleUninstall);
-  const recordUsage = useMutation(api.apps.recordAppUsage);
+  // Seed data on first load
+  useEffect(() => { ensureSeeded().then(() => refresh()); }, []);
+
+  // Update clock
+  useEffect(() => {
+    const i = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(i);
+  }, []);
 
   // ═══ UI State ═══
   const [ctxApp, setCtxApp] = useState<any>(null);
@@ -92,18 +90,14 @@ export default function HomeScreen() {
   const [blockDaysApp, setBlockDaysApp] = useState<any>(null);
   const [blockDaysVal, setBlockDaysVal] = useState(7);
   const [slideBlocked, setSlideBlocked] = useState(false);
-
-  // Time expired overlay
   const [expiredApp, setExpiredApp] = useState<any>(null);
   const [spentToday, setSpentToday] = useState(0);
   const [spentWeek, setSpentWeek] = useState(0);
-
-  // Scroll reminder
   const [showScrollReminder, setShowScrollReminder] = useState(false);
   const scrollEvents = useRef(0);
   const lastScrollTime = useRef(0);
 
-  // ═══ Google Search Swipe Up ═══
+  // Google Search Swipe Up
   const [showGoogleSearch, setShowGoogleSearch] = useState(false);
   const [googleQuery, setGoogleQuery] = useState("");
   const swipeStartY = useRef(0);
@@ -114,7 +108,6 @@ export default function HomeScreen() {
       onPanResponderGrant: (_, gs) => { swipeStartY.current = gs.y0; },
       onPanResponderRelease: (_, gs) => {
         if (swipeStartY.current - gs.moveY > 80) {
-          // Swiped up!
           setGoogleQuery("");
           setShowGoogleSearch(true);
         }
@@ -122,8 +115,8 @@ export default function HomeScreen() {
     })
   ).current;
 
-  // ═══ Derived ═══
-  const visibleApps = (allApps ?? []).filter(a => {
+  // Derived data
+  const visibleApps = (apps ?? []).filter(a => {
     if (hidden?.find(h => h.packageName === a.packageName)) return false;
     if (uninstalled?.find(u => u.packageName === a.packageName)) return false;
     return true;
@@ -131,7 +124,6 @@ export default function HomeScreen() {
   const filteredApps = visibleApps.filter(a =>
     a.name.toLowerCase().includes(searchQ.toLowerCase())
   );
-  // Sort alphabetically for the alpha scroll
   const sortedApps = [...filteredApps].sort((a, b) => a.name.localeCompare(b.name));
 
   const isBlocked = (pkg: string) => {
@@ -143,9 +135,9 @@ export default function HomeScreen() {
   const getBlockExpiry = (pkg: string) => blocklist?.find(b => b.packageName === pkg)?.blockExpiresAt;
   const getLimit = (pkg: string) => blocklist?.find(b => b.packageName === pkg)?.dailyTimeLimitMinutes;
   const getAlias = (pkg: string) => renames?.find(r => r.packageName === pkg)?.aliasName;
-  const isFav = (pkg: string) => favs?.find(f => f.packageName === pkg);
+  const isFav = (pkg: string) => favorites?.find(f => f.packageName === pkg);
   const isHidden = (pkg: string) => hidden?.find(h => h.packageName === pkg);
-  const getUsed = (pkg: string) => usage?.find(u => u.packageName === pkg)?.minutesUsed ?? 0;
+  const getUsed = (pkg: string) => usage?.find(u => u.packageName === pkg && u.date === today())?.minutesUsed ?? 0;
 
   const favoriteApps = visibleApps.filter(a => isFav(a.packageName));
 
@@ -155,7 +147,6 @@ export default function HomeScreen() {
   }
   function closeCtx() { setCtxApp(null); setShowRename(false); }
 
-  // ═══ TAP TO OPEN ═══
   function tapOpen(app: any) {
     const blocked = isBlocked(app.packageName);
     const limit = getLimit(app.packageName);
@@ -172,17 +163,15 @@ export default function HomeScreen() {
       return;
     }
     if (limit && used >= limit) {
-      // Show the "time expired" overlay
       setSpentToday(used);
-      setSpentWeek(Math.round(used * 3.5)); // approximate
+      setSpentWeek(Math.round(used * 3.5));
       setExpiredApp(app);
       return;
     }
-    recordUsage({ packageName: app.packageName, date: today() });
+    recordUsage(app.packageName, today());
     showToast(`Opening ${getAlias(app.packageName) || app.name}...`);
   }
 
-  // ═══ Alpha scroll ═══
   function scrollToLetter(letter: string) {
     const idx = sortedApps.findIndex(a => {
       const first = a.name.charAt(0).toUpperCase();
@@ -194,7 +183,6 @@ export default function HomeScreen() {
     }
   }
 
-  // ═══ Scroll reminder ═══
   const handleListScroll = useCallback((e: any) => {
     if (page !== 1) return;
     const now = Date.now();
@@ -208,7 +196,6 @@ export default function HomeScreen() {
     }
   }, [page, showScrollReminder]);
 
-  // ═══ Slide to Block logic ═══
   const slideAnim = useRef(new Animated.Value(0)).current;
   const slidePan = useRef(
     PanResponder.create({
@@ -220,7 +207,7 @@ export default function HomeScreen() {
           setSlideBlocked(true);
           setTimeout(() => {
             if (blockDaysApp) {
-              blockForDays({ appName: blockDaysApp.name, packageName: blockDaysApp.packageName, days: blockDaysVal });
+              blockForDays(blockDaysApp.name, blockDaysApp.packageName, blockDaysVal);
               showToast(`Blocked for ${blockDaysVal} days`);
             }
             setBlockDaysApp(null);
@@ -238,14 +225,12 @@ export default function HomeScreen() {
     <SafeAreaView edges={["top"]} className="flex-1" style={{ backgroundColor: "#000" }}>
       <StatusBar style="light" />
 
-      {/* Toast */}
       {toastMsg && (
         <View className="absolute top-16 left-5 right-5 z-50 bg-white/10 backdrop-blur rounded-2xl px-5 py-3.5 items-center border border-white/20">
           <Text className="text-white text-sm font-medium">{toastMsg}</Text>
         </View>
       )}
 
-      {/* Scroll reminder */}
       {showScrollReminder && (
         <View className="absolute top-28 left-5 right-5 z-50 bg-white/10 backdrop-blur rounded-2xl px-5 py-4 items-center border border-white/20">
           <AlertTriangle className="text-white mb-1" size={18} />
@@ -253,7 +238,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* ═══════════ PAGES ═══════════ */}
       <ScrollView
         horizontal
         pagingEnabled
@@ -262,9 +246,8 @@ export default function HomeScreen() {
         onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH))}
         className="flex-1"
       >
-        {/* ══════ PAGE 0: HOME ══════ */}
+        {/* PAGE 0: HOME */}
         <View style={{ width: SCREEN_WIDTH, backgroundColor: "#000" }} className="flex-1 px-5">
-          {/* Clock circle widget */}
           <View className="items-center pt-6 pb-4">
             <View className="w-40 h-40 rounded-full border border-white/30 items-center justify-center">
               <Text className="text-5xl font-light text-white tracking-wider" style={{ fontFamily: 'System', fontWeight: '200', letterSpacing: 4 }}>
@@ -276,7 +259,6 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Favorites list (left-aligned, no icons) — swipe up to search Google */}
           <View className="flex-1 pt-2" {...swipeUpPan.panHandlers}>
             {favoriteApps.length === 0 ? (
               <View className="items-center justify-center flex-1">
@@ -301,7 +283,6 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Bottom icons */}
           <View className="flex-row justify-between items-center pb-5 px-1">
             <Phone className="text-white/40" size={20} />
             <View className="flex-row gap-1.5">
@@ -313,9 +294,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ══════ PAGE 1: APP DRAWER ══════ */}
+        {/* PAGE 1: APP DRAWER */}
         <View style={{ width: SCREEN_WIDTH, backgroundColor: "#000" }} className="flex-1">
-          {/* Search bar */}
           <View className="flex-row items-center px-5 pt-3 pb-1">
             <View className="flex-1 flex-row items-center bg-white/10 rounded-full px-4 py-3 mr-3">
               <Search className="text-white/50 mr-3" size={16} />
@@ -332,7 +312,6 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {/* App list + Alpha scroll */}
           <View className="flex-1 flex-row">
             <ScrollView
               ref={listScrollRef}
@@ -384,7 +363,6 @@ export default function HomeScreen() {
               })}
             </ScrollView>
 
-            {/* Alpha scroll index */}
             <View className="w-7 justify-center pr-1">
               {ALPHA.map(letter => (
                 <Pressable
@@ -398,7 +376,6 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Bottom dots */}
           <View className="items-center pb-3">
             <View className="flex-row gap-1.5">
               {[0,1].map(i => (
@@ -409,7 +386,7 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* ═══════ TIME LIMIT PROMPT ═══════ */}
+      {/* TIME LIMIT PROMPT */}
       <Modal visible={!!promptApp} transparent animationType="fade" onRequestClose={() => setPromptApp(null)}>
         <Pressable className="flex-1 justify-center px-6" style={{ backgroundColor: "#00000080" }} onPress={() => setPromptApp(null)}>
           <Pressable className="bg-black rounded-3xl p-6 border border-white/20" onPress={e => e.stopPropagation()}>
@@ -420,8 +397,8 @@ export default function HomeScreen() {
                 <Pressable key={m}
                   onPress={() => {
                     if (promptApp) {
-                      setLimit({ packageName: promptApp.packageName, minutes: m });
-                      recordUsage({ packageName: promptApp.packageName, date: today(), minutes: 0 });
+                      setTimeLimit(promptApp.packageName, m);
+                      recordUsage(promptApp.packageName, today(), 0);
                       showToast(`${m} min limit set`);
                       setPromptApp(null);
                     }
@@ -442,7 +419,7 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* ═══════ GOOGLE SEARCH (Swipe Up) ═══════ */}
+      {/* GOOGLE SEARCH */}
       <Modal visible={showGoogleSearch} transparent animationType="slide" onRequestClose={() => setShowGoogleSearch(false)}>
         <View style={{ backgroundColor: "#000" }} className="flex-1 pt-16 px-5">
           <View className="flex-row items-center bg-white/10 rounded-full px-5 py-3.5 mb-6">
@@ -454,6 +431,7 @@ export default function HomeScreen() {
               className="flex-1 bg-transparent border-0 p-0 text-base text-white"
               placeholderTextColor="#ffffff50"
               autoFocus
+              autoCorrect={false} // avoid TS issues
             />
             <Pressable onPress={() => setShowGoogleSearch(false)} className="p-2 active:opacity-50">
               <Text className="text-white/50 text-sm">Cancel</Text>
@@ -463,7 +441,6 @@ export default function HomeScreen() {
           {googleQuery.length > 0 && (
             <Pressable
               onPress={() => {
-                const url = `https://www.google.com/search?q=${encodeURIComponent(googleQuery)}`;
                 showToast(`Searching Google for "${googleQuery}"`);
                 setShowGoogleSearch(false);
               }}
@@ -483,14 +460,12 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* ═══════ BLOCK FOR DAYS (Slide Dialog) ═══════ */}
+      {/* BLOCK FOR DAYS */}
       <Modal visible={!!blockDaysApp} transparent animationType="fade" onRequestClose={() => setBlockDaysApp(null)}>
         <Pressable className="flex-1 justify-center px-6" style={{ backgroundColor: "#00000080" }} onPress={() => setBlockDaysApp(null)}>
           <Pressable className="bg-black rounded-3xl p-6 border border-white/20" onPress={e => e.stopPropagation()}>
             <Text className="text-white text-base text-center">Block {blockDaysApp?.name} for</Text>
             <Text className="text-white text-3xl font-bold text-center my-4">{blockDaysVal} {blockDaysVal === 1 ? 'day' : 'days'}</Text>
-
-            {/* Slider track */}
             <View className="h-10 justify-center mb-6">
               <View className="h-1 bg-white/20 rounded-full mx-2">
                 <Animated.View
@@ -510,7 +485,6 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Slide to block */}
             <View className="h-14 bg-white/10 rounded-full justify-center overflow-hidden">
               <Animated.View
                 {...slidePan.panHandlers}
@@ -531,7 +505,7 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* ═══════ TIME EXPIRED OVERLAY ═══════ */}
+      {/* TIME EXPIRED OVERLAY */}
       <Modal visible={!!expiredApp} transparent animationType="fade" onRequestClose={() => setExpiredApp(null)}>
         <Pressable className="flex-1 justify-center px-6" style={{ backgroundColor: "#00000080" }} onPress={() => {}}>
           <Pressable className="bg-black rounded-3xl p-6 border border-white/20" onPress={e => e.stopPropagation()}>
@@ -539,7 +513,6 @@ export default function HomeScreen() {
               The time you have decided to spend on <Text className="font-bold">{expiredApp?.name}</Text> has run out.
             </Text>
 
-            {/* Usage columns */}
             <View className="flex-row justify-center gap-8 mb-6">
               <View className="items-center">
                 <Text className="text-white text-xl font-bold">{fmtMins(spentToday)}</Text>
@@ -552,25 +525,20 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* TAKE ME OUT button */}
             <Pressable
-              onPress={() => {
-                showToast("Closing app...");
-                setExpiredApp(null);
-              }}
+              onPress={() => { showToast("Closing app..."); setExpiredApp(null); }}
               className="bg-white rounded-full py-4 items-center mb-4 active:opacity-80"
             >
               <Text className="text-black font-bold text-sm tracking-widest">TAKE ME OUT OF HERE</Text>
             </Pressable>
 
-            {/* Add more time */}
             <Text className="text-white/40 text-xs text-center mb-3">Add more time</Text>
             <View className="flex-row justify-center gap-3">
               {[15, 5, 1].map(m => (
                 <Pressable key={m}
                   onPress={() => {
                     if (expiredApp) {
-                      recordUsage({ packageName: expiredApp.packageName, date: today(), minutes: 0 });
+                      recordUsage(expiredApp.packageName, today(), 0);
                       showToast(`Added ${m} min`);
                       setExpiredApp(null);
                     }
@@ -585,7 +553,7 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* ═══════ CONTEXT MENU ═══════ */}
+      {/* CONTEXT MENU */}
       <Modal visible={!!ctxApp} transparent animationType="fade" onRequestClose={closeCtx}>
         <Pressable className="flex-1 justify-center px-6" style={{ backgroundColor: "#00000080" }} onPress={closeCtx}>
           <Pressable className="bg-black rounded-3xl overflow-hidden border border-white/20" onPress={e => e.stopPropagation()}>
@@ -598,7 +566,7 @@ export default function HomeScreen() {
             {ctxApp && (
               <View className="py-1">
                 <CtxItem icon={Star} label={isFav(ctxApp.packageName) ? "Remove from Favorites" : "Add to Favorites"} color="text-white"
-                  onPress={() => { toggleFav({ packageName: ctxApp.packageName }); closeCtx(); }} />
+                  onPress={() => { toggleFavorite(ctxApp.packageName); closeCtx(); }} />
                 <CtxItem icon={Ban} label="Block for Days" color="text-white"
                   onPress={() => { setBlockDaysApp(ctxApp); setBlockDaysVal(7); closeCtx(); }} />
                 <CtxItem icon={Edit3} label="Rename App" color="text-white"
@@ -607,16 +575,16 @@ export default function HomeScreen() {
                   <View className="flex-row items-center px-6 py-3 gap-2">
                     <Input value={renameVal} onChangeText={setRenameVal} placeholder="New name..."
                       className="flex-1 bg-white/10 rounded-xl px-4 py-2.5 text-white text-sm" placeholderTextColor="#ffffff50" autoFocus />
-                    <Pressable onPress={() => { if (renameVal.trim() && ctxApp) { renameApp({ packageName: ctxApp.packageName, aliasName: renameVal.trim() }); } closeCtx(); }}
+                    <Pressable onPress={() => { if (renameVal.trim() && ctxApp) { renameApp(ctxApp.packageName, renameVal.trim()); } closeCtx(); }}
                       className="px-4 py-2.5 rounded-xl bg-white">
                       <Text className="text-black text-sm font-medium">Save</Text>
                     </Pressable>
                   </View>
                 ) : null}
                 <CtxItem icon={EyeOff} label={isHidden(ctxApp.packageName) ? "Show App" : "Hide App"} color="text-white"
-                  onPress={() => { toggleHidden({ packageName: ctxApp.packageName, hidden: !isHidden(ctxApp.packageName) }); closeCtx(); }} />
+                  onPress={() => { toggleHidden(ctxApp.packageName, !isHidden(ctxApp.packageName)); closeCtx(); }} />
                 <CtxItem icon={Trash2} label="Uninstall App" color="text-white/60"
-                  onPress={() => { toggleUninstall({ packageName: ctxApp.packageName }); closeCtx(); showToast(`${ctxApp.name} uninstalled`); }} />
+                  onPress={() => { toggleUninstall(ctxApp.packageName); closeCtx(); showToast(`${ctxApp.name} uninstalled`); }} />
                 <CtxItem icon={Info} label="App Info" color="text-white/60"
                   onPress={() => { showToast(`${ctxApp.name} • ${ctxApp.packageName}`); closeCtx(); }} />
               </View>
