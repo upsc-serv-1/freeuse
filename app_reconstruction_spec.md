@@ -327,3 +327,36 @@ object LicenseManager {
 4.  **Bypass Feature Gating:** Integrate `LicenseManager.isPremiumUnlocked()` at all feature entry points (custom fonts selection, unlimited schedule creations, hidden app additions, and advanced notification filters) so they immediately evaluate as unlocked.
 
 
+---
+
+## 6. UI/UX Design & Layout Specification
+
+Use the following detailed layout specifications to reconstruct the exact interfaces shown in the screenshots:
+
+### A. Home Screen Layout
+*   **Colors & Theme:** True black background (`#000000`) with high-contrast white text (`#FFFFFF`).
+*   **Time/Date Widget:** Centered at the top. It features a thin circular white outline. Inside the circle, the current time is displayed in a large, clean sans-serif font (e.g. `16:47`), with the date (e.g. `Thursday, 11th June`) in a smaller font directly underneath.
+*   **Favorite Apps List:** Left-aligned vertical list of custom shortcuts in clean, plain sans-serif text (sentence-case, e.g. `Phone`, `Calendar`, `Calculator`, `Messages`). There are no icons beside the names.
+*   **Bottom Utility Icons:** A subtle telephone receiver outline icon at the bottom-left corner and a camera outline icon at the bottom-right corner.
+
+### B. App Drawer (App List)
+*   **Layout:** A vertical text-based scrolling list on a black background.
+*   **Fast Scroll Alphabet Index:** A clean vertical column of letter shortcuts (e.g. `A`, `C`, `D`, `E`, `F`...) aligned against the right edge of the screen for quick navigation.
+*   **Icons:** A magnifying glass icon at the top-right corner for App Search, and a settings gear outline icon at the bottom-right corner for accessing launcher configurations.
+
+### C. Temporary App Blocking Screen/Dialog
+*   **Overlay Card:** A floating card with rounded corners, a thin white border, and a black background.
+*   **Header text:** `"Block [App Name] for"` centered at the top.
+*   **Active selection text:** Selected duration (e.g., `"7 days"`) displayed in a larger, bold font below the header.
+*   **Seekbar Control:** A horizontal slider representing block duration. The slider range is labeled from `"4h"` (far left) to `"30d"` (far right), with discrete tick marks indicating points like `7 days`.
+*   **Enforcement Control:** A bottom pill-shaped slider widget containing a white circular thumb containing a right arrow (`→`) on the left, and text `"SLIDE TO BLOCK"` centered inside the black slider track. The block is triggered only when the user swipes the thumb to the right.
+
+### D. Time Reminder Expired Overlay
+*   **Overlay Card:** Floating card with rounded corners, white borders, and a black background.
+*   **Message text:** `"The time you have decided to spend on [App Name] has run out."`
+*   **Usage Summary Columns:** Shows two columns: `"Spent today: 8 min"` and `"Last 7 days: 2 h 42 min"`.
+*   **Enforce Button:** A prominent white pill-shaped button labeled `"TAKE ME OUT OF HERE"` in bold black uppercase lettering. (Clicking this sends a Home intent to close the app).
+*   **Extend Options:** Below the main button, the text `"Add more time"` sits above three snooze chips: `"15 min"`, `"5 min"` (highlighted with a thin white outline pill), and `"1 min"`.
+
+
+
