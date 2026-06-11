@@ -69,7 +69,7 @@ export default function HomeScreen() {
   const {
     loaded, apps, blocklist, renames, hidden, favorites, uninstalled, usage,
     toggleBlock, blockForDays, setTimeLimit, renameApp, toggleHidden,
-    toggleFavorite, toggleUninstall, recordUsage, refresh
+    toggleFavorite, toggleUninstall, recordUsage, refresh, themeMode
   } = useLocalApps();
 
   // Seed data on first load
@@ -237,7 +237,7 @@ export default function HomeScreen() {
   ).current;
 
   return (
-    <SafeAreaView edges={["top"]} className="flex-1" style={{ backgroundColor: "#000" }}>
+    <SafeAreaView edges={["top"]} className={`flex-1 ${themeMode === "hacker" ? "hacker" : ""}`} style={{ backgroundColor: "#000" }}>
       <StatusBar style="light" />
 
       {toastMsg && (

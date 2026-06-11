@@ -55,6 +55,11 @@ export function usePermissions() {
   return useContext(PermissionsContext);
 }
 
+// ═══ Theme mode shared via simple module-level ref ═══
+let _globalThemeMode: "system" | "light" | "dark" | "hacker" = "system";
+export function getGlobalThemeMode() { return _globalThemeMode; }
+export function setGlobalThemeMode(mode: "system" | "light" | "dark" | "hacker") { _globalThemeMode = mode; }
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [perms, setPerms] = useState<PermissionsState>(defaultPerms);
@@ -104,7 +109,7 @@ export default function RootLayout() {
 
   return (
     <PermissionsContext.Provider value={{ perms, checkPermissions, openAccessibility, openUsageStats, openBatteryOpt, openOverlaySettings }}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={{ flex: 1 }} className={perms.checking ? "" : ""}>
         <BottomSheetModalProvider>
           <UIThemeProvider>
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

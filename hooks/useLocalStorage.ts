@@ -105,6 +105,7 @@ const KEYS = {
   favorites: "@minimalist/favorites",
   usage: "@minimalist/usage",
   uninstalled: "@minimalist/uninstalled",
+  themeMode: "@minimalist/themeMode",
 };
 
 // ═══ Generic helpers ═══
@@ -138,6 +139,7 @@ export function useLocalApps() {
   const [uninstalled, setUninstalled] = useState<UninstalledApp[]>([]);
   const [usage, setUsage] = useState<FocusSession[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [themeMode, setThemeModeState] = useState<"system" | "light" | "dark" | "hacker">("system");
 
   const refresh = useCallback(async () => {
     const [a, b, r, h, f, u, us] = await Promise.all([
@@ -156,6 +158,13 @@ export function useLocalApps() {
     setFavorites(f);
     setUninstalled(u);
     setUsage(us);
+    // Load theme preference
+    try {
+      const saved = await AsyncStorage.getItem(KEYS.themeMode);
+      if (saved === "system" || saved === "light" || saved === "dark" || saved === "hacker") {
+        setThemeModeState(saved);
+      }
+    } catch {}
     setLoaded(true);
   }, []);
 
@@ -304,6 +313,11 @@ export function useLocalApps() {
     setUsage(list);
   }, []);
 
+  const setThemeMode = useCallback(async (mode: "system" | "light" | "dark" | "hacker") => {
+    await AsyncStorage.setItem(KEYS.themeMode, mode);
+    setThemeModeState(mode);
+  }, []);
+
   return {
     loaded,
     apps,
@@ -313,6 +327,7 @@ export function useLocalApps() {
     favorites,
     uninstalled,
     usage,
+    themeMode,
     refresh,
     toggleBlock,
     blockForDays,
@@ -322,5 +337,6 @@ export function useLocalApps() {
     toggleFavorite,
     toggleUninstall,
     recordUsage,
+    setThemeMode,
   };
 }

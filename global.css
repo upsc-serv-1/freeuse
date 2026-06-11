@@ -47,4 +47,26 @@
     --input: 0 0% 20%;
     --ring: 0 0% 100%;
   }
+
+  .hacker {
+    --background: 120 100% 0%;
+    --foreground: 120 100% 50%;
+    --card: 120 100% 2%;
+    --card-foreground: 120 100% 50%;
+    --popover: 120 100% 0%;
+    --popover-foreground: 120 100% 50%;
+    --primary: 120 100% 50%;
+    --primary-foreground: 120 100% 0%;
+    --secondary: 120 50% 8%;
+    --secondary-foreground: 120 100% 50%;
+    --muted: 120 50% 5%;
+    --muted-foreground: 120 60% 35%;
+    --accent: 120 50% 8%;
+    --accent-foreground: 120 100% 50%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 120 100% 0%;
+    --border: 120 50% 15%;
+    --input: 120 50% 10%;
+    --ring: 120 100% 50%;
+  }
 }
