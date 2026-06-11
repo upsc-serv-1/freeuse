@@ -13,6 +13,7 @@ export default defineSchema({
     packageName: v.string(),
     blocked: v.boolean(),
     dailyTimeLimitMinutes: v.optional(v.number()),
+    blockExpiresAt: v.optional(v.number()), // timestamp when block auto-expires
     createdAt: v.number(),
   }).index("by_app", ["packageName"]),
 

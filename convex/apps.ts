@@ -64,6 +64,7 @@ export const getBlocklist = query({
     packageName: v.string(),
     blocked: v.boolean(),
     dailyTimeLimitMinutes: v.optional(v.number()),
+    blockExpiresAt: v.optional(v.number()),
     createdAt: v.number(),
   })),
   handler: async (ctx) => {
@@ -86,12 +87,42 @@ export const toggleBlockApp = mutation({
       .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { blocked: args.blocked });
+      await ctx.db.patch(existing._id, { blocked: args.blocked, blockExpiresAt: undefined });
     } else {
       await ctx.db.insert("blocklist", {
         appName: args.appName,
         packageName: args.packageName,
         blocked: args.blocked,
+        createdAt: Date.now(),
+      });
+    }
+    return null;
+  },
+});
+
+// Block an app for a specific number of days
+export const blockAppForDays = mutation({
+  args: {
+    appName: v.string(),
+    packageName: v.string(),
+    days: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const expiresAt = Date.now() + args.days * 24 * 60 * 60 * 1000;
+    const existing = await ctx.db
+      .query("blocklist")
+      .withIndex("by_app", (q) => q.eq("packageName", args.packageName))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { blocked: true, blockExpiresAt: expiresAt });
+    } else {
+      await ctx.db.insert("blocklist", {
+        appName: args.appName,
+        packageName: args.packageName,
+        blocked: true,
+        blockExpiresAt: expiresAt,
         createdAt: Date.now(),
       });
     }
