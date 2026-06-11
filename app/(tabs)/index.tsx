@@ -9,6 +9,14 @@ import { Pressable, ScrollView, Modal, Dimensions, Animated, PanResponder } from
 import { useRouter } from "expo-router";
 import { useLocalApps, ensureSeeded } from "@/hooks/useLocalStorage";
 import { usePermissions } from "@/app/_layout";
+import { MatrixRain } from "@/components/hacker/MatrixRain";
+import { SystemStatus } from "@/components/hacker/SystemStatus";
+import { TelemetryStream } from "@/components/hacker/TelemetryStream";
+import { HackLog } from "@/components/hacker/HackLog";
+import { TerminalPrompt } from "@/components/hacker/TerminalPrompt";
+import { DigitalClock } from "@/components/hacker/DigitalClock";
+import { CommandPrompt } from "@/components/hacker/CommandPrompt";
+import { FileTree } from "@/components/hacker/FileTree";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TIME_OPTS = [1, 5, 15, 30, 60];
@@ -263,6 +271,40 @@ export default function HomeScreen() {
       >
         {/* PAGE 0: HOME */}
         <View style={{ width: SCREEN_WIDTH, backgroundColor: "#000" }} className="flex-1 px-5">
+          {themeMode === "hacker" ? (
+            <>
+              {/* Matrix Rain background */}
+              <MatrixRain color="#00ff41" />
+
+              {/* Hacker Dashboard */}
+              <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 12, paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+                {/* Hacker Clock */}
+                <DigitalClock color="#00ff41" />
+
+                {/* Terminal Prompt */}
+                <TerminalPrompt color="#00ff41" />
+
+                {/* System Status Cards */}
+                <SystemStatus color="#00ff41" />
+
+                {/* Telemetry Stream */}
+                <TelemetryStream color="#00ff41" />
+
+                {/* Command Terminal */}
+                <CommandPrompt color="#00ff41" />
+
+                {/* File Tree */}
+                <FileTree color="#00ff41" />
+
+                {/* Hack Log */}
+                <HackLog color="#00ff41" />
+
+                {/* Spacer for bottom navigation */}
+                <View style={{ height: 20 }} />
+              </ScrollView>
+            </>
+          ) : (
+            <>
           <View className="items-center pt-6 pb-4">
             <View className="w-40 h-40 rounded-full border border-white/30 items-center justify-center">
               <Text className="text-5xl font-light text-white tracking-wider" style={{ fontFamily: 'System', fontWeight: '200', letterSpacing: 4 }}>
@@ -297,6 +339,8 @@ export default function HomeScreen() {
               </ScrollView>
             )}
           </View>
+          </>
+          )}
 
           <View className="flex-row justify-between items-center pb-5 px-1">
             <Phone className="text-white/40" size={20} />
