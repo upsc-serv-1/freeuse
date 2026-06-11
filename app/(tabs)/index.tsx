@@ -103,6 +103,25 @@ export default function HomeScreen() {
   const scrollEvents = useRef(0);
   const lastScrollTime = useRef(0);
 
+  // ═══ Google Search Swipe Up ═══
+  const [showGoogleSearch, setShowGoogleSearch] = useState(false);
+  const [googleQuery, setGoogleQuery] = useState("");
+  const swipeStartY = useRef(0);
+  const swipeUpPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10 && Math.abs(gs.dx) < 20,
+      onPanResponderGrant: (_, gs) => { swipeStartY.current = gs.y0; },
+      onPanResponderRelease: (_, gs) => {
+        if (swipeStartY.current - gs.moveY > 80) {
+          // Swiped up!
+          setGoogleQuery("");
+          setShowGoogleSearch(true);
+        }
+      },
+    })
+  ).current;
+
   // ═══ Derived ═══
   const visibleApps = (allApps ?? []).filter(a => {
     if (hidden?.find(h => h.packageName === a.packageName)) return false;
@@ -257,8 +276,8 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Favorites list (left-aligned, no icons) */}
-          <View className="flex-1 pt-2">
+          {/* Favorites list (left-aligned, no icons) — swipe up to search Google */}
+          <View className="flex-1 pt-2" {...swipeUpPan.panHandlers}>
             {favoriteApps.length === 0 ? (
               <View className="items-center justify-center flex-1">
                 <Text className="text-white/30 text-sm">No favorites yet</Text>
@@ -421,6 +440,47 @@ export default function HomeScreen() {
             </Pressable>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* ═══════ GOOGLE SEARCH (Swipe Up) ═══════ */}
+      <Modal visible={showGoogleSearch} transparent animationType="slide" onRequestClose={() => setShowGoogleSearch(false)}>
+        <View style={{ backgroundColor: "#000" }} className="flex-1 pt-16 px-5">
+          <View className="flex-row items-center bg-white/10 rounded-full px-5 py-3.5 mb-6">
+            <Search className="text-white/50 mr-3" size={18} />
+            <Input
+              placeholder="Search Google..."
+              value={googleQuery}
+              onChangeText={setGoogleQuery}
+              className="flex-1 bg-transparent border-0 p-0 text-base text-white"
+              placeholderTextColor="#ffffff50"
+              autoFocus
+            />
+            <Pressable onPress={() => setShowGoogleSearch(false)} className="p-2 active:opacity-50">
+              <Text className="text-white/50 text-sm">Cancel</Text>
+            </Pressable>
+          </View>
+
+          {googleQuery.length > 0 && (
+            <Pressable
+              onPress={() => {
+                const url = `https://www.google.com/search?q=${encodeURIComponent(googleQuery)}`;
+                showToast(`Searching Google for "${googleQuery}"`);
+                setShowGoogleSearch(false);
+              }}
+              className="flex-row items-center bg-white/10 rounded-2xl p-4 active:opacity-70"
+            >
+              <Search className="text-white/50 mr-3" size={18} />
+              <Text className="text-white text-base flex-1">Search "{googleQuery}"</Text>
+              <Text className="text-white/30 text-xs">Google</Text>
+            </Pressable>
+          )}
+
+          <View className="flex-1 justify-center items-center">
+            <Search className="text-white/20 mb-4" size={48} />
+            <Text className="text-white/30 text-sm">Swipe up from home screen</Text>
+            <Text className="text-white/20 text-xs mt-1">to search Google instantly</Text>
+          </View>
+        </View>
       </Modal>
 
       {/* ═══════ BLOCK FOR DAYS (Slide Dialog) ═══════ */}
