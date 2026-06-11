@@ -1,5 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NativeModules, Platform } from "react-native";
+
+// ═══ Native bridge ═══
+const AppBlockerNative = Platform.OS === "android" ? NativeModules.AppBlockerModule : null;
+
+async function syncBlockedToNative(blocklist: BlockEntry[]) {
+  if (!AppBlockerNative) return;
+  const now = Date.now();
+  const activeBlocked = blocklist
+    .filter(e => e.blocked && (!e.blockExpiresAt || e.blockExpiresAt > now))
+    .map(e => e.packageName);
+  try {
+    await AppBlockerNative.updateBlockedApps(activeBlocked);
+  } catch (e) {
+    console.warn("Failed to sync blocklist to native:", e);
+  }
+}
 
 // ═══ Types ═══
 export interface AppInfo {
@@ -162,6 +179,7 @@ export function useLocalApps() {
     }
     await setData(KEYS.blocklist, list);
     setBlocklist(list);
+    await syncBlockedToNative(list);
   }, []);
 
   const blockForDays = useCallback(async (appName: string, packageName: string, days: number) => {
@@ -183,6 +201,7 @@ export function useLocalApps() {
     }
     await setData(KEYS.blocklist, list);
     setBlocklist(list);
+    await syncBlockedToNative(list);
   }, []);
 
   const setTimeLimit = useCallback(async (packageName: string, minutes: number) => {
@@ -203,6 +222,7 @@ export function useLocalApps() {
     }
     await setData(KEYS.blocklist, list);
     setBlocklist(list);
+    await syncBlockedToNative(list);
   }, []);
 
   const renameApp = useCallback(async (packageName: string, aliasName: string) => {

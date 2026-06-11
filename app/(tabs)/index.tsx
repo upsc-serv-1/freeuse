@@ -8,6 +8,7 @@ import {
 import { Pressable, ScrollView, Modal, Dimensions, Animated, PanResponder } from "react-native";
 import { useRouter } from "expo-router";
 import { useLocalApps, ensureSeeded } from "@/hooks/useLocalStorage";
+import { usePermissions } from "@/app/_layout";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TIME_OPTS = [1, 5, 15, 30, 60];
@@ -79,6 +80,20 @@ export default function HomeScreen() {
     const i = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(i);
   }, []);
+
+  // ═══ Permissions check ═══
+  const { perms, checkPermissions, openAccessibility, openUsageStats, openBatteryOpt } = usePermissions();
+  const [showPermModal, setShowPermModal] = useState(false);
+
+  useEffect(() => {
+    if (!perms.checking) {
+      if (!perms.accessibilityEnabled || !perms.usageAccessGranted) {
+        // Delay showing the modal slightly so the UI renders first
+        const t = setTimeout(() => setShowPermModal(true), 500);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [perms.checking, perms.accessibilityEnabled, perms.usageAccessGranted]);
 
   // ═══ UI State ═══
   const [ctxApp, setCtxApp] = useState<any>(null);
@@ -595,6 +610,85 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* ═══════ PERMISSIONS MODAL ═══════ */}
+      <Modal visible={showPermModal} transparent animationType="fade" onRequestClose={() => setShowPermModal(false)}>
+        <Pressable className="flex-1 justify-center px-5" style={{ backgroundColor: "#000000CC" }}>
+          <Pressable className="bg-black rounded-3xl overflow-hidden border border-white/20" onPress={e => e.stopPropagation()}>
+            <View className="px-6 pt-8 pb-6">
+              <Text className="text-white text-xl font-bold text-center mb-2">Permissions Required</Text>
+              <Text className="text-white/50 text-xs text-center mb-6 leading-5">
+                To block distracting apps, Minimalist needs two special permissions.
+                Please grant them below — your data stays on-device.
+              </Text>
+
+              {/* Usage Access */}
+              <View className="flex-row items-center mb-4 bg-white/5 rounded-2xl p-4">
+                <View className="w-10 h-10 rounded-full bg-white/10 items-center justify-center mr-4">
+                  <Text className="text-white font-bold">1</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-white text-sm font-medium">Usage Access</Text>
+                  <Text className="text-white/40 text-xs mt-0.5">Lets us detect which app is in the foreground</Text>
+                </View>
+              </View>
+
+              {/* Accessibility */}
+              <View className="flex-row items-center mb-6 bg-white/5 rounded-2xl p-4">
+                <View className="w-10 h-10 rounded-full bg-white/10 items-center justify-center mr-4">
+                  <Text className="text-white font-bold">2</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-white text-sm font-medium">Accessibility Service</Text>
+                  <Text className="text-white/40 text-xs mt-0.5">Real-time detection when you open an app</Text>
+                </View>
+              </View>
+
+              {/* Open settings buttons */}
+              <Pressable
+                onPress={() => { openUsageStats(); }}
+                className="bg-white/10 rounded-full py-3.5 items-center mb-3 active:opacity-70"
+              >
+                <Text className="text-white text-sm font-medium">Open Usage Access Settings</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => { openAccessibility(); }}
+                className="bg-white/10 rounded-full py-3.5 items-center mb-3 active:opacity-70"
+              >
+                <Text className="text-white text-sm font-medium">Open Accessibility Settings</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => { openBatteryOpt(); }}
+                className="bg-white/10 rounded-full py-3.5 items-center mb-6 active:opacity-70"
+              >
+                <Text className="text-white text-sm font-medium">Disable Battery Optimization</Text>
+              </Pressable>
+
+              {/* Recheck */}
+              <Pressable
+                onPress={() => {
+                  checkPermissions().then(() => {
+                    setShowPermModal(false);
+                  });
+                }}
+                className="bg-white rounded-full py-3.5 items-center active:opacity-80"
+              >
+                <Text className="text-black font-bold text-sm">I've Granted Permissions — Check</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setShowPermModal(false)}
+                className="py-3 items-center mt-2 active:opacity-50"
+              >
+                <Text className="text-white/40 text-xs">Skip for now</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </SafeAreaView>
   );
 }
