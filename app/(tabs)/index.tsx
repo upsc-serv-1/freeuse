@@ -1,19 +1,23 @@
 import { useEffect, useState, useRef } from "react";
 import { SafeAreaView, Text, View, Input } from "@/components/ui";
 import { StatusBar } from "expo-status-bar";
-import { Settings, Star, Ban, Edit3, EyeOff, Trash2, Info, Search, ChevronRight, Heart } from "lucide-react-native";
-import { Pressable, ScrollView, Modal, Dimensions, PanResponder, Animated } from "react-native";
+import { Settings, Star, Ban, Edit3, EyeOff, Trash2, Info } from "lucide-react-native";
+import { Pressable, ScrollView, Modal, Dimensions, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const TIME_OPTS = [1, 5, 15, 30, 60];
 
-// ─── Time helpers ───
+// Apps that should prompt for time limit on open
+const DISTRACTING_CATEGORIES = ["Social", "Entertainment", "Messaging", "Shopping"];
+
+// ─── Helpers ───
 function useTime() {
-  const [time, setTime] = useState(new Date());
-  useEffect(() => { const i = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(i); }, []);
-  return time;
+  const [t, s] = useState(new Date());
+  useEffect(() => { const i = setInterval(() => s(new Date()), 1000); return () => clearInterval(i); }, []);
+  return t;
 }
 function fmtTime(d: Date) { return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`; }
 function fmtDate(d: Date) {
@@ -26,6 +30,8 @@ function today() { const d=new Date(); return `${d.getFullYear()}-${(d.getMonth(
 export default function HomeScreen() {
   const time = useTime();
   const router = useRouter();
+  const timeRef = useRef(time);
+  timeRef.current = time;
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
 
@@ -40,17 +46,25 @@ export default function HomeScreen() {
 
   // Mutations
   const toggleBlock = useMutation(api.apps.toggleBlockApp);
+  const setLimit = useMutation(api.apps.setTimeLimit);
   const renameApp = useMutation(api.apps.renameApp);
   const toggleHidden = useMutation(api.apps.toggleHiddenApp);
   const toggleFav = useMutation(api.apps.toggleFavorite);
   const toggleUninstall = useMutation(api.apps.toggleUninstall);
+  const recordUsage = useMutation(api.apps.recordAppUsage);
 
   // Context menu state
   const [ctxApp, setCtxApp] = useState<{ name: string; packageName: string; category: string } | null>(null);
   const [showRename, setShowRename] = useState(false);
   const [renameVal, setRenameVal] = useState("");
 
-  // Visible apps (exclude hidden + uninstalled)
+  // Time limit prompt modal
+  const [promptApp, setPromptApp] = useState<{ name: string; packageName: string; category: string } | null>(null);
+
+  // "Opening" feedback
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Visible apps
   const visibleApps = (allApps ?? []).filter(a => {
     if (hidden?.find(h => h.packageName === a.packageName)) return false;
     if (uninstalled?.find(u => u.packageName === a.packageName)) return false;
@@ -70,9 +84,51 @@ export default function HomeScreen() {
 
   function closeCtx() { setCtxApp(null); setShowRename(false); }
 
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2000);
+  }
+
+  // ═══ TAP TO OPEN APP ═══
+  function tapApp(app: { name: string; packageName: string; category: string }) {
+    const blocked = isBlocked(app.packageName);
+    const limit = getLimit(app.packageName);
+    const used = getUsed(app.packageName);
+    const isDistracting = DISTRACTING_CATEGORIES.includes(app.category);
+
+    // 1. If blocked → show message
+    if (blocked) {
+      showToast(`"${getAlias(app.packageName) || app.name}" is blocked`);
+      return;
+    }
+
+    // 2. If it's a distracting app and no time limit set → prompt for limit
+    if (isDistracting && !limit) {
+      setPromptApp(app);
+      return;
+    }
+
+    // 3. If it has a time limit and it's exhausted
+    if (limit && used >= limit) {
+      showToast(`Time's up for "${getAlias(app.packageName) || app.name}" — ${limit} min used`);
+      return;
+    }
+
+    // 4. Open the app (simulate)
+    recordUsage({ packageName: app.packageName, date: today() });
+    showToast(`Opening ${getAlias(app.packageName) || app.name}...`);
+  }
+
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-background">
       <StatusBar style="auto" />
+
+      {/* ─── Toast Notification ─── */}
+      {toastMsg && (
+        <View className="absolute top-20 left-5 right-5 z-50 bg-foreground/90 rounded-2xl px-5 py-3.5 items-center">
+          <Text className="text-background text-sm font-medium">{toastMsg}</Text>
+        </View>
+      )}
 
       {/* ─── Swipeable Pages ─── */}
       <ScrollView
@@ -86,7 +142,6 @@ export default function HomeScreen() {
       >
         {/* ══════ PAGE 0: HOME ══════ */}
         <View style={{ width: SCREEN_WIDTH }} className="flex-1">
-          {/* Top bar */}
           <View className="flex-row justify-between items-center px-6 pt-2 pb-2">
             <View>
               <Text className="text-2xl font-light text-foreground tracking-wider">{fmtTime(time)}</Text>
@@ -97,13 +152,11 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {/* Restrictions */}
           {restricted.length > 0 && (
             <View className="mx-5 mb-3 bg-muted rounded-2xl p-3.5">
               <Text className="text-xs font-semibold text-foreground mb-2">Today's Restrictions</Text>
               {restricted.slice(0, 4).map(item => {
-                const alias = getAlias(item.packageName);
-                const nm = alias || item.appName || item.packageName;
+                const nm = getAlias(item.packageName) || item.appName || item.packageName;
                 const used = getUsed(item.packageName);
                 const max = item.dailyTimeLimitMinutes ?? 0;
                 return (
@@ -119,7 +172,6 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* Favorites */}
           {favoriteApps.length > 0 && (
             <View className="mx-5 mb-3">
               <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Favorites</Text>
@@ -127,6 +179,7 @@ export default function HomeScreen() {
                 {favoriteApps.slice(0, 8).map(a => (
                   <Pressable
                     key={a.packageName}
+                    onPress={() => tapApp(a)}
                     onLongPress={() => { setCtxApp(a); setRenameVal(getAlias(a.packageName)||""); }}
                     className="bg-muted rounded-xl px-4 py-2.5 active:opacity-70"
                   >
@@ -137,13 +190,11 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* Big clock tap to search */}
           <Pressable onPress={() => router.push("/search" as any)} className="flex-1 items-center justify-center active:opacity-70">
             <Text className="text-7xl font-thin text-foreground tracking-wider mb-2">{fmtTime(time)}</Text>
             <Text className="text-sm text-muted-foreground">Tap to search • Swipe left for apps</Text>
           </Pressable>
 
-          {/* Page dots */}
           <View className="flex-row justify-center pb-2 gap-1.5">
             {[0,1].map(i => <View key={i} className={`w-1.5 h-1.5 rounded-full ${page===i?'bg-foreground':'bg-muted-foreground/30'}`} />)}
           </View>
@@ -153,7 +204,7 @@ export default function HomeScreen() {
         <View style={{ width: SCREEN_WIDTH }} className="flex-1">
           <View className="px-5 pt-2 pb-2">
             <Text className="text-xl font-light text-foreground">All Apps</Text>
-            <Text className="text-xs text-muted-foreground mt-0.5">{visibleApps.length} apps • Long press for options</Text>
+            <Text className="text-xs text-muted-foreground mt-0.5">{visibleApps.length} apps • Tap to open • Long press for options</Text>
           </View>
 
           <ScrollView className="flex-1 px-5" contentContainerClassName="pb-8">
@@ -162,19 +213,26 @@ export default function HomeScreen() {
               const display = alias || app.name;
               const blocked = isBlocked(app.packageName);
               const favorite = isFav(app.packageName);
+              const limit = getLimit(app.packageName);
+              const used = getUsed(app.packageName);
+              const isDistracting = DISTRACTING_CATEGORIES.includes(app.category);
+
               return (
                 <Pressable
                   key={app.packageName}
+                  onPress={() => tapApp(app)}
                   onLongPress={() => { setCtxApp(app); setRenameVal(alias||""); }}
                   className="flex-row items-center py-3.5 border-b border-border active:bg-muted/50"
                 >
-                  {/* Simple text-only row */}
                   <View className="flex-1">
-                    <Text className="text-foreground text-base" numberOfLines={1}>{display}</Text>
+                    <Text className={`text-base ${blocked ? 'text-destructive line-through' : 'text-foreground'}`} numberOfLines={1}>
+                      {display}
+                    </Text>
                     <Text className="text-muted-foreground text-xs mt-0.5">
                       {app.category}
                       {blocked && " • BLOCKED"}
-                      {isHidden(app.packageName) && " • Hidden"}
+                      {isDistracting && !blocked && !limit && " • Tap to set limit"}
+                      {limit ? ` • ${used}/${limit}m` : ""}
                     </Text>
                   </View>
                   {favorite && <Star className="text-amber-400 ml-2" size={14} />}
@@ -183,18 +241,70 @@ export default function HomeScreen() {
             })}
           </ScrollView>
 
-          {/* Page dots */}
           <View className="flex-row justify-center pb-2 gap-1.5">
             {[0,1].map(i => <View key={i} className={`w-1.5 h-1.5 rounded-full ${page===i?'bg-foreground':'bg-muted-foreground/30'}`} />)}
           </View>
         </View>
       </ScrollView>
 
+      {/* ═══════ TIME LIMIT PROMPT MODAL ═══════ */}
+      <Modal visible={!!promptApp} transparent animationType="fade" onRequestClose={() => setPromptApp(null)}>
+        <Pressable className="flex-1 bg-black/50 justify-center px-8" onPress={() => setPromptApp(null)}>
+          <Pressable className="bg-background rounded-3xl p-6" onPress={(e) => e.stopPropagation()}>
+            <Text className="text-lg font-semibold text-foreground text-center mb-1">
+              {getAlias(promptApp?.packageName || "") || promptApp?.name}
+            </Text>
+            <Text className="text-sm text-muted-foreground text-center mb-6">
+              This app can be distracting. Set a daily time limit?
+            </Text>
+
+            <View className="flex-row flex-wrap justify-center gap-3 mb-6">
+              {TIME_OPTS.map(m => (
+                <Pressable
+                  key={m}
+                  onPress={() => {
+                    if (promptApp) {
+                      setLimit({ packageName: promptApp.packageName, minutes: m });
+                      recordUsage({ packageName: promptApp.packageName, date: today() });
+                      showToast(`Opening ${getAlias(promptApp.packageName) || promptApp.name} (${m} min limit)`);
+                      setPromptApp(null);
+                    }
+                  }}
+                  className="px-6 py-3.5 rounded-2xl bg-muted active:opacity-70"
+                >
+                  <Text className="text-foreground text-base font-medium">{m} min</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={() => {
+                  if (promptApp) {
+                    recordUsage({ packageName: promptApp.packageName, date: today() });
+                    showToast(`Opening ${getAlias(promptApp.packageName) || promptApp.name}`);
+                    setPromptApp(null);
+                  }
+                }}
+                className="flex-1 px-4 py-3.5 rounded-2xl bg-muted active:opacity-70"
+              >
+                <Text className="text-foreground text-center font-medium">Open Anyway</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setPromptApp(null)}
+                className="flex-1 px-4 py-3.5 rounded-2xl bg-destructive/20 active:opacity-70"
+              >
+                <Text className="text-destructive text-center font-medium">Cancel</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ═══════ CONTEXT MENU MODAL ═══════ */}
       <Modal visible={!!ctxApp} transparent animationType="fade" onRequestClose={closeCtx}>
         <Pressable className="flex-1 bg-black/40 justify-center px-8" onPress={closeCtx}>
           <Pressable className="bg-background rounded-3xl overflow-hidden" onPress={(e) => e.stopPropagation()}>
-            {/* App name header */}
             {ctxApp && (
               <View className="px-6 pt-6 pb-4 border-b border-border">
                 <Text className="text-lg font-semibold text-foreground">{getAlias(ctxApp.packageName) || ctxApp.name}</Text>
@@ -202,49 +312,32 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* Menu items */}
             {ctxApp && (
               <View className="py-1">
                 <CtxItem icon={Star} label={isFav(ctxApp.packageName) ? "Remove from Favorites" : "Add to Favorites"} color="text-amber-400"
                   onPress={() => { toggleFav({ packageName: ctxApp.packageName }); closeCtx(); }} />
-
                 <CtxItem icon={Ban} label={isBlocked(ctxApp.packageName) ? "Unblock App" : "Block App"} color="text-destructive"
                   onPress={() => { toggleBlock({ appName: ctxApp.name, packageName: ctxApp.packageName, blocked: !isBlocked(ctxApp.packageName) }); closeCtx(); }} />
-
                 <CtxItem icon={Edit3} label="Rename App" color="text-foreground"
                   onPress={() => setShowRename(true)} />
-
                 {showRename ? (
                   <View className="flex-row items-center px-6 py-3 gap-2">
-                    <Input
-                      value={renameVal}
-                      onChangeText={setRenameVal}
-                      placeholder="New name..."
-                      className="flex-1 bg-muted rounded-xl px-4 py-2.5 text-foreground text-sm"
-                      placeholderTextColor="#9BA1A6"
-                      autoFocus
-                    />
-                    <Pressable
-                      onPress={() => { if (renameVal.trim() && ctxApp) { renameApp({ packageName: ctxApp.packageName, aliasName: renameVal.trim() }); } closeCtx(); }}
-                      className="px-4 py-2.5 rounded-xl bg-primary"
-                    >
+                    <Input value={renameVal} onChangeText={setRenameVal} placeholder="New name..."
+                      className="flex-1 bg-muted rounded-xl px-4 py-2.5 text-foreground text-sm" placeholderTextColor="#9BA1A6" autoFocus />
+                    <Pressable onPress={() => { if (renameVal.trim() && ctxApp) { renameApp({ packageName: ctxApp.packageName, aliasName: renameVal.trim() }); } closeCtx(); }}
+                      className="px-4 py-2.5 rounded-xl bg-primary">
                       <Text className="text-primary-foreground text-sm font-medium">Save</Text>
                     </Pressable>
                   </View>
                 ) : null}
-
                 <CtxItem icon={EyeOff} label={isHidden(ctxApp.packageName) ? "Show App" : "Hide App"} color="text-foreground"
                   onPress={() => { toggleHidden({ packageName: ctxApp.packageName, hidden: !isHidden(ctxApp.packageName) }); closeCtx(); }} />
-
                 <CtxItem icon={Trash2} label={isUninstalled(ctxApp.packageName) ? "Reinstall App" : "Uninstall App"} color="text-destructive"
                   onPress={() => { toggleUninstall({ packageName: ctxApp.packageName }); closeCtx(); }} />
-
                 <CtxItem icon={Info} label="App Info" color="text-foreground"
-                  onPress={() => { closeCtx(); }} />
+                  onPress={() => { showToast(`${getAlias(ctxApp.packageName)||ctxApp.name} • ${ctxApp.packageName} • ${ctxApp.category}`); closeCtx(); }} />
               </View>
             )}
-
-            {/* Close button */}
             <Pressable onPress={closeCtx} className="border-t border-border px-6 py-4 active:bg-muted">
               <Text className="text-center text-foreground font-medium">Cancel</Text>
             </Pressable>
@@ -255,7 +348,6 @@ export default function HomeScreen() {
   );
 }
 
-// ─── Context Menu Item ───
 function CtxItem({ icon: Icon, label, color, onPress }: { icon: any; label: string; color: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} className="flex-row items-center px-6 py-3.5 active:bg-muted">
