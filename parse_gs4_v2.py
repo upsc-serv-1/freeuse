@@ -22,11 +22,16 @@ def txt(chunk):
     r = re.sub(r'</?[a-zA-Z][^>]*>', '', r)
     r = r.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&quot;', '"')
     r = r.replace('&lt;', '<').replace('&gt;', '>').replace('&#39;', "'")
-    # Collapse multiple spaces (preserve single spaces around **)
-    r = re.sub(r' {3,}', ' ', r)
-    # Fix bold punctuation (bold before punctuation)
-    r = re.sub(r'\*\*([.,;:!?)\]}])', r'\1', r)
-    r = re.sub(r'([([{])\*\*', r'\1', r)
+    # Collapse multiple spaces
+    r = re.sub(r' +', ' ', r)
+    # Strip whitespace INSIDE bold markers, preserving external spacing
+    # ** content ** -> space_before**content**space_after
+    def clean_bold(m):
+        content = m.group(1)
+        before = ' ' if content.startswith(' ') else ''
+        after = ' ' if content.endswith(' ') else ''
+        return before + '**' + content.strip() + '**' + after
+    r = re.sub(r'\*\*(.+?)\*\*', clean_bold, r)
     # Clean up empty bold
     r = r.replace('****', '').replace('** **', ' ')
     return r.strip()
