@@ -1,7 +1,6 @@
 import { SafeAreaView, Text, View, ScrollView } from "@/components/ui";
 import { useRouter } from "expo-router";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useLocalApps } from "@/hooks/useLocalStorage";
 import { Ban, Clock, EyeOff, Ban as BlockIcon } from "lucide-react-native";
 import { Pressable } from "react-native";
 
@@ -14,11 +13,8 @@ export default function FocusScreen() {
   const router = useRouter();
   const today = getTodayDate();
 
-  const blocklist = useQuery(api.apps.getBlocklist);
-  const usage = useQuery(api.apps.getTodaysUsage, { date: today });
-  const allApps = useQuery(api.apps.getAllApps);
-  const renames = useQuery(api.apps.getAppRenames);
-  const removeFromBlocklist = useMutation(api.apps.removeFromBlocklist);
+  const { apps: allApps, blocklist, usage, renames, removeFromBlocklist } = useLocalApps();
+
 
   const blocked = (blocklist ?? []).filter(b => b.blocked);
   const limited = (blocklist ?? []).filter(b => (b.dailyTimeLimitMinutes ?? 0) > 0);

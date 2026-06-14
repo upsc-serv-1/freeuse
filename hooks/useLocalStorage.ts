@@ -170,19 +170,36 @@ export function useLocalApps() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Mutations
-  const toggleBlock = useCallback(async (appName: string, packageName: string, blocked: boolean) => {
+  const toggleBlock = useCallback(async (
+    arg1: string | { appName: string; packageName: string; blocked: boolean },
+    packageName?: string,
+    blocked?: boolean
+  ) => {
+    let appNameVal = "";
+    let pkgVal = "";
+    let blockedVal = false;
+
+    if (typeof arg1 === "object" && arg1 !== null) {
+      appNameVal = arg1.appName;
+      pkgVal = arg1.packageName;
+      blockedVal = arg1.blocked;
+    } else {
+      appNameVal = arg1;
+      pkgVal = packageName || "";
+      blockedVal = !!blocked;
+    }
+
     const list = await getData<BlockEntry>(KEYS.blocklist, []);
-    const idx = list.findIndex(e => e.packageName === packageName);
+    const idx = list.findIndex(e => e.packageName === pkgVal);
     if (idx >= 0) {
-      list[idx] = { ...list[idx], blocked, blockExpiresAt: undefined };
+      list[idx] = { ...list[idx], blocked: blockedVal, blockExpiresAt: undefined };
     } else {
       list.push({
         _id: `bl${Date.now()}`,
         _creationTime: Date.now(),
-        appName,
-        packageName,
-        blocked,
+        appName: appNameVal,
+        packageName: pkgVal,
+        blocked: blockedVal,
         createdAt: Date.now(),
       });
     }
@@ -190,6 +207,7 @@ export function useLocalApps() {
     setBlocklist(list);
     await syncBlockedToNative(list);
   }, []);
+
 
   const blockForDays = useCallback(async (appName: string, packageName: string, days: number) => {
     const expiresAt = Date.now() + days * 24 * 60 * 60 * 1000;
@@ -233,6 +251,15 @@ export function useLocalApps() {
     setBlocklist(list);
     await syncBlockedToNative(list);
   }, []);
+
+  const removeFromBlocklist = useCallback(async ({ id }: { id: string }) => {
+    const list = await getData<BlockEntry>(KEYS.blocklist, []);
+    const filtered = list.filter(e => e._id !== id);
+    await setData(KEYS.blocklist, filtered);
+    setBlocklist(filtered);
+    await syncBlockedToNative(filtered);
+  }, []);
+
 
   const renameApp = useCallback(async (packageName: string, aliasName: string) => {
     const list = await getData<AppRename>(KEYS.renames, []);
@@ -332,6 +359,7 @@ export function useLocalApps() {
     toggleBlock,
     blockForDays,
     setTimeLimit,
+    removeFromBlocklist,
     renameApp,
     toggleHidden,
     toggleFavorite,

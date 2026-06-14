@@ -3,17 +3,14 @@ import { SafeAreaView, Text, View, ScrollView, Input } from "@/components/ui";
 import { Search, ArrowLeft, Ban, Clock } from "lucide-react-native";
 import { Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useLocalApps } from "@/hooks/useLocalStorage";
 
 export default function SearchScreen() {
   const router = useRouter();
   const [query, setQuery] = useState("");
 
-  const allApps = useQuery(api.apps.getAllApps);
-  const blocklist = useQuery(api.apps.getBlocklist);
-  const toggleBlock = useMutation(api.apps.toggleBlockApp);
-  const setLimit = useMutation(api.apps.setTimeLimit);
+  const { apps: allApps, blocklist, toggleBlock, setTimeLimit: setLimit } = useLocalApps();
+
 
   const isBlocked = (pkg: string) => blocklist?.find(b => b.packageName === pkg)?.blocked ?? false;
   const getLimit = (pkg: string) => blocklist?.find(b => b.packageName === pkg)?.dailyTimeLimitMinutes;
